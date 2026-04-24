@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<RootNamespace>Cirreum.Identity</RootNamespace>
+		<Description>OIDC identity provider integration for Cirreum — webhook-style pre-token provisioning callback compatible with Descope, Auth0, and any OIDC IdP that supports a custom-claims HTTP callback.</Description>
+		<PackageTags>cirreum;identity;oidc;descope;auth0;provisioning;providers</PackageTags>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<FrameworkReference Include="Microsoft.AspNetCore.App" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Cirreum.IdentityProvider" Version="1.0.1" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Using Include="Cirreum.Providers" />
+	</ItemGroup>
+
+</Project>
