@@ -115,6 +115,78 @@ The instance key (e.g. `clientA_descope`) is auto-populated into `ProvisionConte
 - **`AllowedAppIds`** defends against a leaked shared secret being reused against a different application that happens to share the secret. Enable it whenever the IdP populates `clientAppId`.
 - **Body integrity is not verified.** If you need stronger guarantees (HMAC over the body, signed JWT envelope), replace `OidcSharedSecretValidator` with an application-specific implementation.
 
+## Configuring Descope
+
+Descope is the reference integration for this package. The wire contract above is
+IdP-neutral; this section is the practical wiring — including the gotchas that fail
+*silently* if missed.
+
+### Flow wiring
+
+In the Descope flow (the one your OIDC federated app runs at sign-in), add an
+**HTTP connector** step calling the provisioning endpoint, with a request body template
+matching the wire contract:
+
+```json
+{
+  "externalUserId": "{{user.userId}}",
+  "email": "{{user.email}}",
+  "correlationId": "{{flow.executionId}}",
+  "clientAppId": "<project-or-app-id literal>"
+}
+```
+
+- `{{flow.executionId}}` needs the dot syntax (`{{flowExecutionId}}` resolves empty).
+- `{{app.clientId}}` resolves null in B2C/direct-SDK projects — hardcode the ID literal.
+- **Fail closed:** route the connector's error branches through a *Reset Auth Info* step
+  into `END - FAILURE`. Only a success-status `END` mints a JWT, and a provisioning
+  outage must deny sign-in, not skip provisioning.
+- The flow editor's **Test Run does not call real connectors** — only a live browser
+  sign-in exercises the HTTP connector path.
+
+### Applying the returned roles — `roles` is a reserved claim name
+
+After the connector step, branch on its `allowed` output and apply its `roles` output
+with a **Custom Claims** action. The critical gotcha:
+
+> **A custom claim named `roles` is silently dropped.** `roles` is a Descope system
+> claim (the RBAC projection, alongside `amr`, `drn`, `tenants`, `permissions`). The
+> action reports success and the JWT is simply unchanged. Use **`customRoles`** instead.
+
+To verify a custom claim actually registered, decode the **refresh JWT** and check its
+`dcl` (declared custom claims) array — the claim name must appear there.
+
+### Getting the claims into the ID token — `descope.custom_claims`
+
+Custom claims are stored on the refresh token and copied into session tokens on refresh.
+For an OIDC federated app, they reach the **ID token** only when the client's
+authorization request includes the **`descope.custom_claims` scope**:
+
+```csharp
+// Blazor WASM client (Cirreum.Runtime.Wasm.Oidc)
+idp.DefaultScopes.Add("customRoles");
+idp.DefaultScopes.Add("descope.custom_claims");
+```
+
+Without that scope the failure is asymmetric and confusing: the **access token** carries
+`customRoles` (APIs work), but the **ID token** doesn't — and browser clients build
+their principal from the ID token, so client-side role checks silently deny while the
+server behaves normally.
+
+On the client, register an `IClaimsExtender` (via `AddClaimsExtender<T>()` on the
+Wasm.Oidc builder) that normalizes the `customRoles` array into individual `roles`
+claims — providers emit role arrays as a single JSON-array-valued property, which never
+matches `User.IsInRole` without normalization.
+
+### Freshness model
+
+The custom claims are captured **once, when this webhook runs** (at flow execution), and
+then ride the entire refresh chain — a role change reaches the client only on a fresh
+sign-in. Treat client-side token roles as UI gating, and keep server-side authorization
+authoritative: when the access token carries no `roles` claim, Cirreum's server claims
+transformation resolves roles from the application store per request via the app's
+registered `IApplicationUserResolver`, so revocation is immediate where it matters.
+
 ## What's not in this package
 
 - **The app's `IUserProvisioner` implementation** — apps register theirs via `builder.AddIdentity().AddProvisioner<TProvisioner>("instance_key")` in the Runtime Extensions layer. This package only resolves the keyed service at callback time.
