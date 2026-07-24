@@ -187,10 +187,12 @@ Without that scope the failure is asymmetric and confusing: the **access token**
 their principal from the ID token, so client-side role checks silently deny while the
 server behaves normally.
 
-On the client, register an `IClaimsExtender` (via `AddClaimsExtender<T>()` on the
-Wasm.Oidc builder) that normalizes the `customRoles` array into individual `roles`
-claims — providers emit role arrays as a single JSON-array-valued property, which never
-matches `User.IsInRole` without normalization.
+On the client, no extender is needed: `Cirreum.Runtime.Wasm` (1.1.0+) canonicalizes every
+provisioned `custom*` claim automatically during authentication — `customRoles` aliases to the
+configured role claim type and its JSON-array value splits into individual claims, so
+`User.IsInRole` just works. Register an `IClaimsExtender` (via `AddClaimsExtender<T>()` on the
+Wasm.Oidc builder) only for app-specific transformations, such as resolving precedence when a
+token carries both a native claim and its minted `custom*` counterpart.
 
 ### Freshness model
 
