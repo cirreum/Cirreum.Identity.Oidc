@@ -11,11 +11,16 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Cirreum.IdentityProvider" Version="1.0.8" />
+		<PackageReference Include="Cirreum.IdentityProvider" Version="2.0.0" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<Using Include="Cirreum.Providers" />
+	</ItemGroup>
+
+	<!-- InternalsVisibleTo: Local Development Only -->
+	<ItemGroup Label="InternalsVisibleTo" Condition="'$(IsLocalBuild)' == 'true'">
+		<InternalsVisibleTo Include="$(AssemblyName).Tests" />
 	</ItemGroup>
 
 </Project>

@@ -14,9 +14,9 @@
 
 1. Authenticate itself with a shared secret.
 2. Supply the authenticating user's details (external ID, email, correlation ID, client app ID).
-3. Receive a decision — allow (with roles) or deny.
+3. Receive a decision — allow (with a `custom*` claim set) or deny.
 
-The returned decision is mapped into the IdP's custom-claims response, so the issued token carries the provisioned roles.
+The returned decision is mapped into the IdP's custom-claims response, so the issued token carries the provisioned claims (roles, name, tenant, …).
 
 ## Installation
 
@@ -43,15 +43,25 @@ Content-Type: application/json
 
 ### Response
 
+Every provisioned claim lives in a `custom*` namespace and rides in a `customClaims` object, each
+member an array. The former top-level `roles` field is gone — roles are `customClaims.customRoles`,
+one member like any other claim:
+
 ```
 200 OK (allowed) or 403 Forbidden (denied)
 
 {
   "allowed":       true | false,
-  "roles":         ["role1", "role2"],
+  "customClaims": {
+    "customRoles":  ["role1", "role2"],
+    "customName":   ["Jane Smith"],
+    "customTenant": ["acme"]
+  },
   "correlationId": "<echoed from request>"
 }
 ```
+
+A provisioner that admits the user but mints nothing returns a 200 with an empty `customClaims` object.
 
 ### Error responses
 
@@ -60,7 +70,7 @@ Content-Type: application/json
 | 401 Unauthorized | Missing / invalid shared secret |
 | 400 Bad Request  | Malformed JSON body or missing `externalUserId` |
 | 403 Forbidden    | `clientAppId` not in configured allowlist, OR provisioner returned `Deny` |
-| 500 Internal Server Error | Provisioner threw, or returned `Allow` with zero roles |
+| 500 Internal Server Error | Provisioner threw |
 
 ## Configuration
 
@@ -144,14 +154,18 @@ matching the wire contract:
 - The flow editor's **Test Run does not call real connectors** — only a live browser
   sign-in exercises the HTTP connector path.
 
-### Applying the returned roles — `roles` is a reserved claim name
+### Applying the returned claims — `roles` is a reserved claim name
 
-After the connector step, branch on its `allowed` output and apply its `roles` output
-with a **Custom Claims** action. The critical gotcha:
+After the connector step, branch on its `allowed` output and apply each member of its
+`customClaims` output with a **Custom Claims** action — map `customClaims.customRoles` to the
+`customRoles` claim, `customClaims.customName` to `customName`, and so on. Because the response
+already names every member `custom*`, the connector-output path and the target claim name are the
+same string. The critical gotcha this convention exists for:
 
 > **A custom claim named `roles` is silently dropped.** `roles` is a Descope system
 > claim (the RBAC projection, alongside `amr`, `drn`, `tenants`, `permissions`). The
-> action reports success and the JWT is simply unchanged. Use **`customRoles`** instead.
+> action reports success and the JWT is simply unchanged. The `custom*` namespace sidesteps
+> this for every claim, not just roles — **`customRoles`** never collides.
 
 To verify a custom claim actually registered, decode the **refresh JWT** and check its
 `dcl` (declared custom claims) array — the claim name must appear there.

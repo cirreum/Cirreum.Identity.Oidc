@@ -7,8 +7,9 @@ using System.Text.Json.Serialization;
 /// to an OIDC IdP's pre-token webhook.
 /// </summary>
 /// <remarks>
-/// IdP-side flow actions read the <c>allowed</c> and <c>roles</c> fields to drive
-/// conditional branches, set custom claims, or fail the sign-in.
+/// IdP-side flow actions read the <c>allowed</c> flag to admit or fail the sign-in, and map each
+/// member of the <c>customClaims</c> object (<c>customRoles</c>, <c>customName</c>, …) to its own
+/// token claim by member path.
 /// </remarks>
 internal sealed record OidcProvisionResponse {
 
@@ -20,15 +21,36 @@ internal sealed record OidcProvisionResponse {
 	public bool Allowed { get; init; }
 
 	/// <summary>
-	/// The roles to embed in the issued token. Empty when <see cref="Allowed"/> is
-	/// <see langword="false"/>.
+	/// The provisioned claims to embed in the issued token, keyed by their <c>custom*</c> wire
+	/// name. Empty when the user was denied, and a legitimate empty when the user is admitted
+	/// with no minted claims.
 	/// </summary>
-	[JsonPropertyName("roles")]
-	public IReadOnlyList<string> Roles { get; init; } = [];
+	[JsonPropertyName("customClaims")]
+	public IReadOnlyDictionary<string, string[]> CustomClaims { get; init; } = Empty;
 
 	/// <summary>
 	/// Echoes the correlation identifier supplied in the request.
 	/// </summary>
 	[JsonPropertyName("correlationId")]
 	public string CorrelationId { get; init; } = "";
+
+	private static readonly IReadOnlyDictionary<string, string[]> Empty = new Dictionary<string, string[]>();
+
+	/// <summary>An admit response carrying the projected <c>custom*</c> claim map.</summary>
+	internal static OidcProvisionResponse Allow(
+		string correlationId,
+		IReadOnlyDictionary<string, string[]> claims) =>
+		new() {
+			Allowed = true,
+			CustomClaims = claims,
+			CorrelationId = correlationId
+		};
+
+	/// <summary>A deny response — no claims.</summary>
+	internal static OidcProvisionResponse Deny(string correlationId) =>
+		new() {
+			Allowed = false,
+			CorrelationId = correlationId
+		};
+
 }

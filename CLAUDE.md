@@ -39,10 +39,9 @@ For each enabled instance in `Cirreum:Identity:Providers:Oidc:Instances:*`, this
 4. Check `clientAppId` against `AllowedAppIds` when the allowlist is configured (403 on mismatch).
 5. Resolve `IUserProvisioner` keyed by `settings.Source` (= instance key).
 6. Invoke `ProvisionAsync` with the built `ProvisionContext`.
-7. Map `ProvisionResult`:
-   - `Allowed { Roles: [...] }` → 200 with response body
-   - `Allowed { Roles: [] }` → 500 (provisioner bug — allow-no-roles)
-   - `Denied` → 403 with `allowed: false` body
+7. Wrap the provisioner call in `ProvisioningTelemetry.StartProvision("oidc", Source)` and map `ProvisionResult`:
+   - `Allowed { Claims }` → 200 with body. `Claims.ToClaimMap()` projects each `custom*` claim into the response's `customClaims` object (`OidcProvisionResponse.Allow`). An empty claim set is valid — 200 with an empty `customClaims`.
+   - `Denied` → 403 with `allowed: false` body (`OidcProvisionResponse.Deny`)
    - Exception → 500
 
 ### Key types
@@ -55,7 +54,7 @@ For each enabled instance in `Cirreum:Identity:Providers:Oidc:Instances:*`, this
 | `OidcConnectorHandler` | `Cirreum.Identity.Oidc` | internal | HTTP handler |
 | `OidcSharedSecretValidator` | `Cirreum.Identity.Oidc` | internal | Constant-time header compare |
 | `OidcJsonContext` | `Cirreum.Identity.Oidc` | internal | Source-gen JSON context |
-| `OidcProvisionRequest` / `OidcProvisionResponse` | `Cirreum.Identity.Oidc.Models` | internal | Wire DTOs |
+| `OidcProvisionRequest` / `OidcProvisionResponse` | `Cirreum.Identity.Oidc.Models` | internal | Wire DTOs; the response carries `allowed` + a `customClaims` object of `custom*` claims (`Allow(correlationId, map)` / `Deny(correlationId)` factories) |
 
 ### RootNamespace
 
@@ -68,7 +67,7 @@ The csproj sets `<RootNamespace>Cirreum.Identity</RootNamespace>` so folder conv
 
 ## Dependencies
 
-- **Cirreum.IdentityProvider** — base registrar, provisioning contracts (`IUserProvisioner`, `ProvisionContext`, `ProvisionResult`), settings base types
+- **Cirreum.IdentityProvider** (v2.0.0+) — base registrar, provisioning contracts (`IUserProvisioner`, `IProvisionedIdentity`, `IdentityClaim`, `ProvisionContext`, `ProvisionResult.Allow(claims)`, `ToClaimMap`, `ProvisioningTelemetry`), settings base types
 - **Microsoft.AspNetCore.App** — `IEndpointRouteBuilder`, `HttpRequest`, `Results`, etc.
 
 ## What's not here
