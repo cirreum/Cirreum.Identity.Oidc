@@ -7,11 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-07-23
+
 ### Added
 
 - Provisioned claims beyond roles. The provisioning response now projects the application's full
   `IProvisionedIdentity.Claims` set into a `customClaims` object, keyed by `custom*` wire name
-  (`customRoles`, `customName`, `customTenant`, …), each an array. The hand-authored IdP flow
+  (`customRoles`, `customName`, `customTenant`, â€¦), each an array. The hand-authored IdP flow
   maps each `customClaims.custom*` member to its own token claim by member path.
 - OpenTelemetry: the provisioner callback is now wrapped in the Core
   `Cirreum.Identity.Provisioning` telemetry scope, tagged `provider = oidc`, emitting the
@@ -26,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hand-authored IdP flow that read `roles` must read `customClaims.customRoles` instead. The
   package's public .NET surface (registrar, settings) is unchanged.
 - An allowed result with no claims is now a valid outcome (the app admits the user but mints
-  nothing beyond what the IdP itself issues) — it returns a 200 with an empty `customClaims`
+  nothing beyond what the IdP itself issues) â€” it returns a 200 with an empty `customClaims`
   object, instead of the former 500. The empty-roles guard is removed.
 
 ## [1.0.7] - 2026-07-20
